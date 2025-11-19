@@ -15,18 +15,27 @@ Clean, script-centric workflow matching the XGBoost project structure.
 
 ## Quick Start
 
-### Step 1: Install Dependencies
+### Step 1: Create and Activate Virtual Environment
+```powershell
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+.\venv\Scripts\Activate.ps1
+```
+
+### Step 2: Install Dependencies
 ```powershell
 pip install -r requirements.txt
 ```
 
-### Step 2: Train Model
+### Step 3: Train Model
 ```powershell
 python train_rf_phishing.py
 ```
 This creates `checkpoints/phishing_detector/rf_phishing_detector.joblib`
 
-### Step 3: Configure Splunk (Optional)
+### Step 4: Configure Splunk (Optional)
 Edit `.env` file and add your Splunk credentials:
 ```bash
 SPLUNK_HEC_URL=https://your-splunk.com:8088/services/collector
@@ -34,22 +43,35 @@ SPLUNK_TOKEN=your-hec-token-here
 SPLUNK_INDEX=security
 ```
 
-### Step 4: Start API Server
+### Step 5: Start API Server
 ```powershell
-python api_server_fastapi.py
+python api_server_fastapi.py 8001
 ```
-- API Docs: http://localhost:8000/docs
+**Note:** Port 8001 is used because Splunk typically runs on port 8000. You can specify any available port as an argument.
+
+- API Docs: http://localhost:8001/docs
 - Alerts auto-send to Splunk when phishing detected
 
-### Step 5: Test Prediction
+### Step 6: Test Prediction
+
+#### Example: Clearly Phishing Email
 ```powershell
-# PowerShell
 $body = @{
-    subject = "URGENT Account Suspended"
-    body = "Click here to verify: http://phishing-site.tk"
+    subject = "URGENT: Your Account Will Be Closed!"
+    body = "Dear Customer, Your account has been suspended due to unusual activity. Click here immediately to verify your identity and restore access: http://secure-banking-verify.tk/login.php?user=confirm. You have 24 hours before permanent deletion. Enter your password and SSN to continue."
 } | ConvertTo-Json
 
-Invoke-RestMethod -Uri "http://localhost:8000/predict" -Method POST -Body $body -ContentType "application/json"
+Invoke-RestMethod -Uri "http://localhost:8001/predict" -Method POST -Body $body -ContentType "application/json"
+```
+
+#### Example: Clearly Legitimate Email
+```powershell
+$body = @{
+    subject = "Team Meeting Notes - Q4 Planning"
+    body = "Hi Team, Thanks for attending today's planning meeting. Here are the key takeaways: 1) Q4 goals approved, 2) New hire onboarding starts Monday, 3) Budget review next Friday at 2pm in Conference Room B. Please review the attached slides and send feedback by EOD Thursday. Best regards, Sarah"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:8001/predict" -Method POST -Body $body -ContentType "application/json"
 ```
 
 ### Optional: Benchmark & Robustness
@@ -90,7 +112,7 @@ $body = @{
     body = "Verify your account now"
 } | ConvertTo-Json
 
-Invoke-RestMethod -Uri "http://localhost:8000/predict" -Method POST -Body $body -ContentType "application/json"
+Invoke-RestMethod -Uri "http://localhost:8001/predict" -Method POST -Body $body -ContentType "application/json"
 ```
 
 **Batch Prediction:**
@@ -102,7 +124,7 @@ $body = @{
     )
 } | ConvertTo-Json -Depth 3
 
-Invoke-RestMethod -Uri "http://localhost:8000/predict/batch" -Method POST -Body $body -ContentType "application/json"
+Invoke-RestMethod -Uri "http://localhost:8001/predict/batch" -Method POST -Body $body -ContentType "application/json"
 ```
 
 ## Splunk Integration

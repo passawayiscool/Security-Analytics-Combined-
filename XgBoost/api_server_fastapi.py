@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel
 from predict_phishing import predict_email
 import uvicorn
@@ -11,6 +11,8 @@ import hashlib
 from urllib.parse import urlparse
 import tldextract
 import sys
+import pandas as pd
+import io
 
 app = FastAPI(title="Phishing Detection API", version="1.0")
 
@@ -195,6 +197,85 @@ async def predict(email: EmailRequest, request: Request):
         send_to_splunk(error_event)
         
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/predict/csv")
+async def predict_csv(file: UploadFile = File(...)):
+    """
+    Upload CSV file with 'subject' and 'body' columns for batch prediction
+    Returns predictions for all emails and sends alerts to Splunk
+    """
+    try:
+        # Read CSV file
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+        
+        # Validate columns
+        if 'subject' not in df.columns or 'body' not in df.columns:
+            raise HTTPException(
+                status_code=400,
+                detail="CSV must contain 'subject' and 'body' columns"
+            )
+        
+        results = []
+        phishing_count = 0
+        
+        # Process each row
+        for idx, row in df.iterrows():
+            subject = str(row.get('subject', ''))
+            body = str(row.get('body', ''))
+            
+            # Get prediction
+            result = predict_email(subject, body)
+            
+            # Enrich with indicators
+            indicators = extract_indicators(subject, body)
+            
+            # Build result for this email
+            email_result = {
+                "row_index": int(idx),
+                "subject": subject,
+                "is_phishing": result["is_phishing"],
+                "phishing_probability": result["phishing_probability"],
+                "confidence": result["confidence"],
+                "label": result["label"]
+            }
+            
+            results.append(email_result)
+            
+            if result["is_phishing"]:
+                phishing_count += 1
+            
+            # Prepare event data for Splunk
+            event_data = {
+                "timestamp": datetime.now().isoformat(),
+                "action": "csv_batch_prediction",
+                "row_index": int(idx),
+                "model_version": MODEL_VERSION,
+                "email_subject": subject,
+                "email_body_length": len(body or ""),
+                "prediction": result["label"],
+                "is_phishing": result["is_phishing"],
+                "phishing_probability": result["phishing_probability"],
+                "confidence": result["confidence"],
+                "severity": "HIGH" if result["is_phishing"] and result["confidence"] > 0.7 else ("MEDIUM" if result["is_phishing"] else "LOW"),
+                "features": indicators,
+            }
+            
+            # Send to Splunk
+            send_to_splunk(event_data)
+        
+        return {
+            "status": "success",
+            "total_emails": len(results),
+            "phishing_detected": phishing_count,
+            "legitimate_detected": len(results) - phishing_count,
+            "predictions": results
+        }
+        
+    except pd.errors.EmptyDataError:
+        raise HTTPException(status_code=400, detail="CSV file is empty")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing CSV: {str(e)}")
 
 @app.get("/health")
 async def health():

@@ -2,10 +2,11 @@
 FastAPI server for Random Forest phishing detection
 Minimal REST API similar to XGBoost implementation
 """
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import joblib
 import numpy as np
+import pandas as pd
 from typing import List, Optional
 from feature_extraction_rf import features_from_text
 import uvicorn
@@ -15,6 +16,7 @@ import requests
 from datetime import datetime
 import hashlib
 import socket
+import io
 
 # Load environment variables from .env file
 load_dotenv()
@@ -242,6 +244,83 @@ def predict_batch(batch: EmailBatchRequest):
         return {"predictions": results, "count": len(results)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/predict/csv")
+async def predict_csv(file: UploadFile = File(...)):
+    """Upload CSV file with 'subject' and 'body' columns for batch prediction"""
+    try:
+        # Read CSV file
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+        
+        # Validate columns
+        if 'subject' not in df.columns or 'body' not in df.columns:
+            raise HTTPException(
+                status_code=400,
+                detail="CSV must contain 'subject' and 'body' columns"
+            )
+        
+        results = []
+        phishing_count = 0
+        
+        # Process each row
+        for idx, row in df.iterrows():
+            subject = str(row.get('subject', ''))
+            body = str(row.get('body', ''))
+            email_text = f"Subject: {subject}\n\n{body}"
+            
+            # Extract features and predict
+            features_dict = features_from_text(email_text)
+            feature_vector = np.array([features_dict.get(name, 0.0) for name in feature_names])
+            X = feature_vector.reshape(1, -1)
+            X_scaled = scaler.transform(X)
+            
+            prediction = model.predict(X_scaled)[0]
+            proba = model.predict_proba(X_scaled)[0]
+            
+            if proba[1] > 0.9:
+                action = "BLOCK"
+            elif proba[1] > 0.7:
+                action = "QUARANTINE"
+            elif proba[1] > 0.5:
+                action = "REVIEW"
+            else:
+                action = "ALLOW"
+            
+            result = {
+                "row_index": int(idx),
+                "subject": subject,
+                "is_phishing": bool(prediction == 1),
+                "phishing_probability": float(proba[1]),
+                "confidence": float(proba[prediction]),
+                "risk_score": int(proba[1] * 100),
+                "label": "Phishing" if prediction == 1 else "Legitimate",
+                "recommended_action": action
+            }
+            
+            results.append(result)
+            
+            # Send high-risk emails to Splunk
+            if result["is_phishing"] or result["risk_score"] > 50:
+                phishing_count += 1
+                send_to_splunk(
+                    email_data={"subject": subject, "body": body},
+                    prediction_result=result
+                )
+        
+        return {
+            "status": "success",
+            "total_emails": len(results),
+            "phishing_detected": phishing_count,
+            "legitimate_detected": len(results) - phishing_count,
+            "predictions": results
+        }
+        
+    except pd.errors.EmptyDataError:
+        raise HTTPException(status_code=400, detail="CSV file is empty")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing CSV: {str(e)}")
 
 
 @app.get("/model/info")

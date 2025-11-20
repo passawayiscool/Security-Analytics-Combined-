@@ -21,7 +21,7 @@ Clean, script-centric workflow matching the XGBoost project structure.
 python -m venv venv
 
 # Activate virtual environment
-.\venv\Scripts\Activate.ps1
+.\venv\Scripts\Activate.bat
 ```
 
 ### Step 2: Install Dependencies
@@ -35,7 +35,7 @@ python train_rf_phishing.py
 ```
 This creates `checkpoints/phishing_detector/rf_phishing_detector.joblib`
 
-### Step 4: Configure Splunk (Optional)
+### Step 4: Configure Splunk 
 Edit `.env` file and add your Splunk credentials:
 ```bash
 SPLUNK_HEC_URL=https://your-splunk.com:8088/services/collector
@@ -125,6 +125,19 @@ $body = @{
 } | ConvertTo-Json -Depth 3
 
 Invoke-RestMethod -Uri "http://localhost:8001/predict/batch" -Method POST -Body $body -ContentType "application/json"
+```
+
+**CSV File Upload (Bulk Processing):**
+```powershell
+# Upload CSV file with 'subject' and 'body' columns
+curl.exe -X POST "http://localhost:8001/predict/csv" -F "file=@test_emails.csv"
+```
+
+CSV file format:
+```csv
+subject,body
+"URGENT: Verify Account","Click here immediately: http://phishing.tk"
+"Team Meeting","Hi everyone, meeting at 2pm in Conference Room B"
 ```
 
 ## Splunk Integration

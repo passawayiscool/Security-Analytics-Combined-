@@ -54,7 +54,7 @@ XGBOOST_MODEL/
 python -m venv venv
 
 # Activate virtual environment
-.\venv\Scripts\Activate.ps1
+.\venv\Scripts\Activate.bat
 ```
 
 ### 2. Install Dependencies
@@ -164,6 +164,19 @@ $body = @{
 } | ConvertTo-Json
 
 Invoke-RestMethod -Uri "http://localhost:8002/predict" -Method POST -Body $body -ContentType "application/json"
+```
+
+**CSV File Upload (Bulk Processing):**
+```powershell
+# Upload CSV file with 'subject' and 'body' columns
+curl.exe -X POST "http://localhost:8002/predict/csv" -F "file=@test_emails.csv"
+```
+
+CSV file format:
+```csv
+subject,body
+"URGENT: Verify Account","Click here immediately: http://phishing.tk"
+"Team Meeting","Hi everyone, meeting at 2pm in Conference Room B"
 ```
 
 ## 🔗 Splunk Integration

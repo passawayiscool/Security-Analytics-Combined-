@@ -1,5 +1,8 @@
 import argparse
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import (
+        accuracy_score, precision_score, recall_score, f1_score, roc_auc_score,
+        average_precision_score, confusion_matrix, matthews_corrcoef, brier_score_loss
+    )
 
 def evaluate_model(csv_path, model_path="phishing_text_model.joblib"):
     """
@@ -28,17 +31,30 @@ def evaluate_model(csv_path, model_path="phishing_text_model.joblib"):
     probas = pipeline.predict_proba(X)[:, 1]
     y_pred = (probas >= threshold).astype(int)
 
-    # Metrics
     accuracy = accuracy_score(y_true, y_pred)
     precision = precision_score(y_true, y_pred, zero_division=0)
     recall = recall_score(y_true, y_pred, zero_division=0)
     f1 = f1_score(y_true, y_pred, zero_division=0)
+    auc_pr = average_precision_score(y_true, probas)
+    roc_auc = roc_auc_score(y_true, probas)
+    cm = confusion_matrix(y_true, y_pred)
+    matthews = matthews_corrcoef(y_true, y_pred)
+    brier = brier_score_loss(y_true, probas)
+    # Confusion matrix: [[TN, FP], [FN, TP]]
+    TN, FP, FN, TP = cm.ravel() if cm.size == 4 else (0, 0, 0, 0)
+    false_positive_rate = FP / (FP + TN) if (FP + TN) > 0 else 0.0
 
     print("\nModel Evaluation Metrics:")
     print(f"  Accuracy: {accuracy:.4f}")
     print(f"  Precision: {precision:.4f}")
     print(f"  Recall: {recall:.4f}")
     print(f"  F1-score: {f1:.4f}")
+    print(f"  AUC-PR: {auc_pr:.4f}")
+    print(f"  ROC-AUC: {roc_auc:.4f}")
+    print(f"  Confusion Matrix: [TN={TN}, FP={FP}], [FN={FN}, TP={TP}]")
+    print(f"  False Positive Rate: {false_positive_rate:.4f}")
+    print(f"  Matthews Correlation: {matthews:.3f}")
+    print(f"  Brier Score: {brier:.4f}")
     print(f"  Parsing Success Rate: {parsing_success_rate:.4f} ({len(valid_rows)}/{len(df)})")
 
 # Predict phishing emails using trained text-based model

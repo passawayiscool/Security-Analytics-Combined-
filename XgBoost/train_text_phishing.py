@@ -205,6 +205,7 @@ for i, (feat_name, importance) in enumerate(sorted_orig[:10], 1):
     print(f"   {i}. {feat_name}: {importance:.4f}")
 
 # 12) Save model
+
 print("\n[12] Saving model...")
 model_data = {
     "pipeline": pipeline,
@@ -228,6 +229,11 @@ model_data = {
 joblib.dump(model_data, "phishing_text_model.joblib")
 print("   Model saved to: phishing_text_model.joblib")
 
+# Save raw XGBoost model for compatibility
+booster = pipeline.named_steps["xgb"].get_booster()
+booster.save_model("phishing_text_model.xgb")
+print("   Raw XGBoost model saved to: phishing_text_model.xgb")
+
 # Also write a standalone JSON report for convenient consumption
 report = {
     "dataset": "Enron.csv",
@@ -241,6 +247,8 @@ try:
     # Attach model file size if available
     if os.path.exists("phishing_text_model.joblib"):
         report["model_size_bytes"] = os.path.getsize("phishing_text_model.joblib")
+    if os.path.exists("phishing_text_model.xgb"):
+        report["xgb_model_size_bytes"] = os.path.getsize("phishing_text_model.xgb")
     with open("metrics_report.json", "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
     print("   Metrics report written to: metrics_report.json")

@@ -1,3 +1,69 @@
+import argparse
+import os
+from sklearn.metrics import (
+        accuracy_score, precision_score, recall_score, f1_score, roc_auc_score,
+        average_precision_score, confusion_matrix, matthews_corrcoef, brier_score_loss
+    )
+
+def evaluate_model(csv_path, model_path="phishing_text_model.joblib"):
+    """
+    Evaluate model on labeled CSV and print metrics
+    Args:
+        csv_path: Path to CSV with 'subject', 'body', and 'label' columns
+        model_path: Path to saved model
+    """
+    df = pd.read_csv(csv_path)
+    required_cols = {"subject", "body", "label"}
+    if not required_cols.issubset(df.columns):
+        raise ValueError("CSV must contain 'subject', 'body', and 'label' columns")
+
+    # Only keep rows with valid labels (0 or 1)
+    valid_rows = df[df["label"].isin([0, 1])]
+    parsing_success_rate = len(valid_rows) / max(1, len(df))
+
+    # Load model
+    model_data = joblib.load(model_path)
+    pipeline = model_data["pipeline"]
+    threshold = model_data.get("threshold", 0.5)
+
+    # Extract features
+    X = features_from_dataframe(valid_rows[["subject", "body"]])
+    y_true = valid_rows["label"].values
+    probas = pipeline.predict_proba(X)[:, 1]
+    y_pred = (probas >= threshold).astype(int)
+
+    accuracy = accuracy_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, zero_division=0)
+    recall = recall_score(y_true, y_pred, zero_division=0)
+    f1 = f1_score(y_true, y_pred, zero_division=0)
+    auc_pr = average_precision_score(y_true, probas)
+    roc_auc = roc_auc_score(y_true, probas)
+    cm = confusion_matrix(y_true, y_pred)
+    matthews = matthews_corrcoef(y_true, y_pred)
+    brier = brier_score_loss(y_true, probas)
+    # Confusion matrix: [[TN, FP], [FN, TP]]
+    TN, FP, FN, TP = cm.ravel() if cm.size == 4 else (0, 0, 0, 0)
+    false_positive_rate = FP / (FP + TN) if (FP + TN) > 0 else 0.0
+    total_predictions = len(y_true)
+    correct_predictions = TN + TP
+    total_predicted_positive = TP + FP
+    total_actual_positive = TP + FN
+    print(f"\nEvaluating on {len(y_true)} samples from '{os.path.basename(csv_path)}':")
+    print(f"  - Legitimate (0): {(y_true == 0).sum()} samples")
+    print(f"  - Phishing (1):   {(y_true == 1).sum()} samples")
+
+    print("\nModel Evaluation Metrics:")
+    print(f"  Accuracy: {accuracy:.2%} ({correct_predictions}/{total_predictions} correct)")
+    print(f"  Precision: {precision:.2%} ({TP} TP / {total_predicted_positive} predicted positive)")
+    print(f"  Recall: {recall:.2%} ({TP} TP / {total_actual_positive} actual positive)")
+    print(f"  F1-Score: {f1:.2%}")
+    print(f"  AUC-PR: {auc_pr:.2%}")
+    print(f"  ROC-AUC: {roc_auc:.2%}")
+    print(f"  Confusion Matrix: [TN={TN}, FP={FP}], [FN={FN}, TP={TP}]")
+    print(f"  Matthews Correlation: {matthews:.3f}") # This is a coefficient, not a percentage
+    print(f"  Brier Score: {brier:.4f}") # This is a score, lower is better, not a percentage
+    print(f"  Parsing Success Rate: {parsing_success_rate:.2%} ({len(valid_rows)}/{len(df)})")
+
 # Predict phishing emails using trained text-based model
 
 import pandas as pd
@@ -21,7 +87,7 @@ def predict_email(subject, body, model_path="phishing_text_model.joblib"):
     pipeline = model_data["pipeline"]
     threshold = model_data.get("threshold", 0.5)
     
-    # Create DataFrame
+    # Create DataFrame 
     df = pd.DataFrame([{"subject": subject, "body": body}])
     
     # Extract features
@@ -82,91 +148,23 @@ def predict_batch(csv_path, output_path="predictions.csv", model_path="phishing_
 
 # Example usage
 if __name__ == "__main__":
-    # Example 1: Phishing email prediction
-    print("=" * 60)
-    print("EXAMPLE 1: Phishing Email Detection")
-    print("=" * 60)
-    
-    test_subject_phishing = "URGENT: Verify your account immediately"
-    test_body_phishing = """
-    Dear Customer,
-    
-    Your account has been suspended due to unusual activity.
-    Click here to verify your identity immediately:
-    http://suspicious-bank-verify.tk/login
-    
-    Failure to act within 24 hours will result in permanent account closure.
-    """
-    
-    result_phishing = predict_email(test_subject_phishing, test_body_phishing)
-    print(f"\nSubject: {test_subject_phishing}")
-    print(f"Prediction: {result_phishing['label']}")
-    print(f"Probability: {result_phishing['phishing_probability']:.2%}")
-    print(f"Confidence: {result_phishing['confidence']:.2%}")
-    
-    # Example 2: Legitimate email prediction (order confirmation)
-    print("\n" + "=" * 60)
-    print("EXAMPLE 2: Legitimate Email Detection (Order Confirmation)")
-    print("=" * 60)
-    
-    test_subject_legitimate = "Your order #12345 has been shipped"
-    test_body_legitimate = """
-    Hi John,
-    
-    Great news! Your order #12345 has been shipped and is on its way.
-    
-    Order Details:
-    - Product: Laptop Computer
-    - Tracking Number: 1Z999AA10123456784
-    - Expected Delivery: November 10, 2025
-    
-    You can track your package at our official website.
-    
-    Thank you for shopping with us!
-    
-    Best regards,
-    Customer Service Team
-    """
-    
-    result_legitimate = predict_email(test_subject_legitimate, test_body_legitimate)
-    print(f"\nSubject: {test_subject_legitimate}")
-    print(f"Prediction: {result_legitimate['label']}")
-    print(f"Probability: {result_legitimate['phishing_probability']:.2%}")
-    print(f"Confidence: {result_legitimate['confidence']:.2%}")
-    
-    # Example 3: Legitimate email prediction (meeting notes - high confidence)
-    print("\n" + "=" * 60)
-    print("EXAMPLE 3: Legitimate Email Detection (Meeting Notes)")
-    print("=" * 60)
-    
-    test_subject_legitimate2 = "Meeting notes from today's standup"
-    test_body_legitimate2 = """
-    Hi team,
-    
-    Here are the key points from today's standup meeting:
-    
-    - Sprint progress is on track, 8 out of 10 stories completed
-    - Design review scheduled for Thursday at 2pm
-    - John will demo the new feature tomorrow
-    - No major blockers reported
-    
-    Next standup is tomorrow at 9am as usual.
-    
-    Please review the attached documents before tomorrow's design meeting.
-    
-    Thanks,
-    Sarah
-    """
-    
-    result_legitimate2 = predict_email(test_subject_legitimate2, test_body_legitimate2)
-    print(f"\nSubject: {test_subject_legitimate2}")
-    print(f"Prediction: {result_legitimate2['label']}")
-    print(f"Probability: {result_legitimate2['phishing_probability']:.2%}")
-    print(f"Confidence: {result_legitimate2['confidence']:.2%}")
-    
-    # Example 4: Batch prediction
-    print("\n" + "=" * 60)
-    print("EXAMPLE 4: Batch Prediction")
-    print("=" * 60)
-    print("\nTo predict on a CSV file, use:")
-    print('  predict_batch("your_emails.csv", "predictions.csv")')
+    parser = argparse.ArgumentParser(description="Phishing Email Prediction and Model Evaluation")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # Batch prediction option
+    batch_parser = subparsers.add_parser("batch", help="Run batch prediction on emails CSV")
+    batch_parser.add_argument("--input", required=True, help="Input CSV file with 'subject' and 'body' columns")
+    batch_parser.add_argument("--output", required=True, help="Output CSV file for predictions")
+    batch_parser.add_argument("--model", default="phishing_text_model.joblib", help="Path to trained model file")
+
+    # Model evaluation option
+    eval_parser = subparsers.add_parser("evaluate", help="Evaluate model on labeled emails CSV")
+    eval_parser.add_argument("--input", required=True, help="Input CSV file with 'subject', 'body', and 'label' columns")
+    eval_parser.add_argument("--model", default="phishing_text_model.joblib", help="Path to trained model file")
+
+    args = parser.parse_args()
+
+    if args.command == "batch":
+        predict_batch(args.input, args.output, args.model) 
+    elif args.command == "evaluate":
+        evaluate_model(args.input, args.model)

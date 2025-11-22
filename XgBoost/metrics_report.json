@@ -1,30 +1,31 @@
 {
   "dataset": "Enron.csv",
-  "n_train": 20106,
-  "n_val": 3549,
-  "n_test": 5914,
-  "threshold": 0.4677097499370575,
+  "n_train": 20697,
+  "n_val": 4436,
+  "n_test": 4436,
+  "threshold": 0.5652543306350708,
   "metrics": {
-    "test_auc_pr": 0.951603406296515,
-    "test_roc_auc": 0.9549318270184415,
-    "best_f1": 0.8824388462937679,
-    "brier_score": 0.08081435708127548,
-    "accuracy": 0.8911058505241799,
-    "precision": 0.8879500367376929,
-    "recall": 0.8769956458635704,
-    "mcc": 0.7810809968201771,
-    "false_positive_rate": 0.09658011399620013,
+    "test_auc_pr": 0.9512414393604082,
+    "test_roc_auc": 0.9533183723073574,
+    "best_f1": 0.87962037961988,
+    "brier_score": 0.08387458643314027,
+    "accuracy": 0.8913435527502255,
+    "precision": 0.909137842023748,
+    "recall": 0.8519593613933236,
+    "mcc": 0.7821646272038961,
+    "false_positive_rate": 0.07429295061207261,
     "confusion_matrix": [
       [
-        2853,
-        305
+        2193,
+        176
       ],
       [
-        339,
-        2417
+        306,
+        1761
       ]
     ],
-    "train_time_seconds": 98.39696440001717
+    "train_time_seconds": 53.87993739999365
   },
-  "model_size_bytes": 8308737
+  "model_size_bytes": 9798602,
+  "xgb_model_size_bytes": 9754950
 }

@@ -22,7 +22,7 @@ BRAND_WORDS = {"paypal", "amazon", "ebay", "netflix", "apple", "microsoft", "goo
                "bank of america", "wells fargo", "chase", "citibank"}
 
 def extract_urls_from_text(text):
-    """Extract all URLs from text"""
+    """Extract all URLs from text"""    
     url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
     return re.findall(url_pattern, str(text))
 

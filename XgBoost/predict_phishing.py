@@ -1,9 +1,15 @@
 import argparse
 import os
+import pandas as pd
+import joblib
+import psutil
+from feature_extraction_text import features_from_dataframe
 from sklearn.metrics import (
         accuracy_score, precision_score, recall_score, f1_score, roc_auc_score,
         average_precision_score, confusion_matrix, matthews_corrcoef, brier_score_loss
     )
+ 
+
 
 def evaluate_model(csv_path, model_path="phishing_text_model.joblib"):
     """
@@ -26,11 +32,19 @@ def evaluate_model(csv_path, model_path="phishing_text_model.joblib"):
     pipeline = model_data["pipeline"]
     threshold = model_data.get("threshold", 0.5)
 
+    # --- Memory usage measurement for evaluation ---
+    process = psutil.Process(os.getpid())
+    mem_before_eval = process.memory_info().rss
+
     # Extract features
     X = features_from_dataframe(valid_rows[["subject", "body"]])
     y_true = valid_rows["label"].values
     probas = pipeline.predict_proba(X)[:, 1]
     y_pred = (probas >= threshold).astype(int)
+
+    mem_after_eval = process.memory_info().rss
+    eval_mem_mb = (mem_after_eval - mem_before_eval) / (1024 * 1024)
+    # --- End measurement ---
 
     accuracy = accuracy_score(y_true, y_pred)
     precision = precision_score(y_true, y_pred, zero_division=0)
@@ -63,12 +77,8 @@ def evaluate_model(csv_path, model_path="phishing_text_model.joblib"):
     print(f"  Matthews Correlation: {matthews:.3f}") # This is a coefficient, not a percentage
     print(f"  Brier Score: {brier:.4f}") # This is a score, lower is better, not a percentage
     print(f"  Parsing Success Rate: {parsing_success_rate:.2%} ({len(valid_rows)}/{len(df)})")
+    print(f"  Evaluation RAM usage: {eval_mem_mb:.2f} MB")
 
-# Predict phishing emails using trained text-based model
-
-import pandas as pd
-import joblib
-from feature_extraction_text import features_from_dataframe
 
 def predict_email(subject, body, model_path="phishing_text_model.joblib"):
     """

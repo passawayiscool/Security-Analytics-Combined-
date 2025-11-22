@@ -45,16 +45,18 @@ print(f"   Feature names: {list(X.columns)}")
 
 # 3) Train/validation/test split
 print("\n[3] Splitting data...")
-X_train, X_holdout, y_train, y_holdout = train_test_split(
-    X, y, test_size=0.2, stratify=y, random_state=42
+# First, split off 15% for test
+X_temp, X_test, y_temp, y_test = train_test_split(
+    X, y, test_size=0.15, stratify=y, random_state=42
 )
+# Then, split remaining 85% into 70/15 (train/val)
 X_train, X_val, y_train, y_val = train_test_split(
-    X_train, y_train, test_size=0.15, stratify=y_train, random_state=42
+    X_temp, y_temp, test_size=0.1765, stratify=y_temp, random_state=42
 )
 
 print(f"   Training set: {len(X_train)} samples")
 print(f"   Validation set: {len(X_val)} samples")
-print(f"   Test set: {len(X_holdout)} samples")
+print(f"   Test set: {len(X_test)} samples")
 
 # 4) Compute scale_pos_weight (for imbalanced datasets)
 n_pos = y_train.sum()
@@ -126,20 +128,20 @@ print(f"   ROC-AUC: {val_rocauc:.4f}")
 
 # 8) Evaluate on holdout test set
 print("\n[8] Test set performance:")
-X_holdout_transformed = pipeline.named_steps["poly"].transform(X_holdout)
-X_holdout_transformed = pipeline.named_steps["scaler"].transform(X_holdout_transformed)
-test_probs = pipeline.named_steps["xgb"].predict_proba(X_holdout_transformed)[:, 1]
+X_test_transformed = pipeline.named_steps["poly"].transform(X_test)
+X_test_transformed = pipeline.named_steps["scaler"].transform(X_test_transformed)
+test_probs = pipeline.named_steps["xgb"].predict_proba(X_test_transformed)[:, 1]
 
-test_avg_prec = average_precision_score(y_holdout, test_probs)
-test_rocauc = roc_auc_score(y_holdout, test_probs)
+test_avg_prec = average_precision_score(y_test, test_probs)
+test_rocauc = roc_auc_score(y_test, test_probs)
 print(f"   AUC-PR: {test_avg_prec:.4f}")
 print(f"   ROC-AUC: {test_rocauc:.4f}")
-test_brier = brier_score_loss(y_holdout, test_probs)
+test_brier = brier_score_loss(y_test, test_probs)
 print(f"   Brier score: {test_brier:.4f} (lower is better)")
 
 # 9) Find optimal threshold by maximizing F1 score
 print("\n[9] Finding optimal classification threshold...")
-prec, rec, thresholds = precision_recall_curve(y_holdout, test_probs)
+prec, rec, thresholds = precision_recall_curve(y_test, test_probs)
 f1_scores = 2 * prec * rec / (prec + rec + 1e-12)
 best_idx = np.nanargmax(f1_scores)
 best_threshold = thresholds[best_idx] if best_idx < len(thresholds) else 0.5
@@ -149,10 +151,10 @@ print(f"   Best F1 score: {np.max(f1_scores):.4f}")
 # 10) Classification report with optimal threshold
 print("\n[10] Classification Report (with optimal threshold):")
 test_preds = (test_probs >= best_threshold).astype(int)
-print(classification_report(y_holdout, test_preds, target_names=["Legitimate", "Phishing"]))
+print(classification_report(y_test, test_preds, target_names=["Legitimate", "Phishing"]))
 
 print("\nConfusion Matrix:")
-cm = confusion_matrix(y_holdout, test_preds)
+cm = confusion_matrix(y_test, test_preds)
 print(cm)
 print(f"\nTrue Negatives: {cm[0,0]}")
 print(f"False Positives: {cm[0,1]}")
@@ -160,10 +162,10 @@ print(f"False Negatives: {cm[1,0]}")
 print(f"True Positives: {cm[1,1]}")
 
 # Additional scalar metrics at best threshold
-acc = accuracy_score(y_holdout, test_preds)
-prec_th = precision_score(y_holdout, test_preds, zero_division=0)
-rec_th = recall_score(y_holdout, test_preds, zero_division=0)
-mcc = matthews_corrcoef(y_holdout, test_preds)
+acc = accuracy_score(y_test, test_preds)
+prec_th = precision_score(y_test, test_preds, zero_division=0)
+rec_th = recall_score(y_test, test_preds, zero_division=0)
+mcc = matthews_corrcoef(y_test, test_preds)
 fpr = cm[0,1] / max(1, (cm[0,1] + cm[0,0]))
 print(f"\nAccuracy: {acc:.4f}")
 print(f"Precision: {prec_th:.4f}")
@@ -239,7 +241,7 @@ report = {
     "dataset": "Enron.csv",
     "n_train": int(len(X_train)),
     "n_val": int(len(X_val)),
-    "n_test": int(len(X_holdout)),
+    "n_test": int(len(X_test)),
     "threshold": float(best_threshold),
     "metrics": model_data["metrics"],
 }

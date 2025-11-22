@@ -1,4 +1,5 @@
 import argparse
+import os
 from sklearn.metrics import (
         accuracy_score, precision_score, recall_score, f1_score, roc_auc_score,
         average_precision_score, confusion_matrix, matthews_corrcoef, brier_score_loss
@@ -43,19 +44,25 @@ def evaluate_model(csv_path, model_path="phishing_text_model.joblib"):
     # Confusion matrix: [[TN, FP], [FN, TP]]
     TN, FP, FN, TP = cm.ravel() if cm.size == 4 else (0, 0, 0, 0)
     false_positive_rate = FP / (FP + TN) if (FP + TN) > 0 else 0.0
+    total_predictions = len(y_true)
+    correct_predictions = TN + TP
+    total_predicted_positive = TP + FP
+    total_actual_positive = TP + FN
+    print(f"\nEvaluating on {len(y_true)} samples from '{os.path.basename(csv_path)}':")
+    print(f"  - Legitimate (0): {(y_true == 0).sum()} samples")
+    print(f"  - Phishing (1):   {(y_true == 1).sum()} samples")
 
     print("\nModel Evaluation Metrics:")
-    print(f"  Accuracy: {accuracy:.4f}")
-    print(f"  Precision: {precision:.4f}")
-    print(f"  Recall: {recall:.4f}")
-    print(f"  F1-score: {f1:.4f}")
-    print(f"  AUC-PR: {auc_pr:.4f}")
-    print(f"  ROC-AUC: {roc_auc:.4f}")
+    print(f"  Accuracy: {accuracy:.2%} ({correct_predictions}/{total_predictions} correct)")
+    print(f"  Precision: {precision:.2%} ({TP} TP / {total_predicted_positive} predicted positive)")
+    print(f"  Recall: {recall:.2%} ({TP} TP / {total_actual_positive} actual positive)")
+    print(f"  F1-Score: {f1:.2%}")
+    print(f"  AUC-PR: {auc_pr:.2%}")
+    print(f"  ROC-AUC: {roc_auc:.2%}")
     print(f"  Confusion Matrix: [TN={TN}, FP={FP}], [FN={FN}, TP={TP}]")
-    print(f"  False Positive Rate: {false_positive_rate:.4f}")
-    print(f"  Matthews Correlation: {matthews:.3f}")
-    print(f"  Brier Score: {brier:.4f}")
-    print(f"  Parsing Success Rate: {parsing_success_rate:.4f} ({len(valid_rows)}/{len(df)})")
+    print(f"  Matthews Correlation: {matthews:.3f}") # This is a coefficient, not a percentage
+    print(f"  Brier Score: {brier:.4f}") # This is a score, lower is better, not a percentage
+    print(f"  Parsing Success Rate: {parsing_success_rate:.2%} ({len(valid_rows)}/{len(df)})")
 
 # Predict phishing emails using trained text-based model
 

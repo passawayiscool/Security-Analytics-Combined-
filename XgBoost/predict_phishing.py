@@ -80,7 +80,7 @@ def predict_email(subject, body, model_path="phishing_text_model.joblib"):
     pipeline = model_data["pipeline"]
     threshold = model_data.get("threshold", 0.5)
     
-    # Create DataFrame
+    # Create DataFrame 
     df = pd.DataFrame([{"subject": subject, "body": body}])
     
     # Extract features
